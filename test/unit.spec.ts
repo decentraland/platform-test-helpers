@@ -1,8 +1,7 @@
-import { createRunner } from "../src"
-import expect from "expect"
+import { runProgram } from "../src"
 
 describe("unit", () => {
   it("smoke test", () => {
-    expect(typeof createRunner).toEqual("function")
+    expect(typeof runProgram).toEqual("function")
   })
 })
