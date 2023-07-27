@@ -1,12 +1,10 @@
 import { createServerComponent, IFetchComponent, Router } from "@well-known-components/http-server"
 import { IHttpServerComponent } from "@well-known-components/interfaces"
-
-import expect from "expect"
-import { createRunner } from "../../src"
+import { runProgram } from "../../src"
 import { createLocalFetchCompoment, defaultServerConfig } from "../../src/localFetch"
 
 type Components = {
-  fetch: IFetchComponent,
+  fetch: IFetchComponent
   server: IHttpServerComponent<GlobalContext>
 }
 type GlobalContext = {
@@ -20,7 +18,7 @@ const logs = {
     debug: (message: string) => {},
     info: (message: string) => {},
     warn: (message: string) => {},
-  })
+  }),
 }
 const configMap = defaultServerConfig()
 const config = {
@@ -30,47 +28,51 @@ const config = {
   requireString: async (a: keyof typeof configMap) => configMap[a]!,
 }
 
-const ROUTE_URL = '/some-route'
+const ROUTE_URL = "/some-route"
 const RESPONSE = { someProp: true }
 
-const test = createRunner<Components>({
-  async main({ startComponents, components }) {
-    const router = new Router<GlobalContext>()
+describe("test local fetch component", () => {
+  let testProgram
 
-    router.get(ROUTE_URL, async (_ctx) => {
-     return { status: 200, body: RESPONSE }
+  beforeAll(async () => {
+    testProgram = await runProgram<Components>({
+      async main({ startComponents, components }) {
+        const router = new Router<GlobalContext>()
+
+        router.get(ROUTE_URL, async (_ctx) => {
+          return { status: 200, body: RESPONSE }
+        })
+
+        components.server.use(router.allowedMethods())
+        components.server.use(router.middleware())
+
+        components.server.setContext({ components })
+
+        await startComponents()
+      },
+      async initComponents() {
+        return {
+          fetch: await createLocalFetchCompoment(config),
+          server: await createServerComponent<GlobalContext>({ config, logs }, {}),
+        }
+      },
     })
+  })
 
-    components.server.use(router.allowedMethods())
-    components.server.use(router.middleware())
-
-    components.server.setContext({ components })
-
-    await startComponents()
-  },
-  async initComponents() {
-    return {
-      fetch: await createLocalFetchCompoment(config),
-      server: await createServerComponent<GlobalContext>({ config, logs }, {})
-    }
-  },
-})
-
-test("test local fetch component", ({ components, stubComponents }) => {
   it("should return response json", async () => {
-    const { fetch } = components
+    const { fetch } = testProgram.components
     const response = await (await fetch.fetch(ROUTE_URL)).json()
 
     expect(response).toStrictEqual(RESPONSE)
   })
 
   it("sould fail if its an external url", async () => {
-    const { fetch } = components
+    const { fetch } = testProgram.components
     try {
-      await fetch.fetch('https://some-route.com')
+      await fetch.fetch("https://some-route.com")
     } catch (e: unknown) {
       if (e instanceof Error) {
-        expect(e.message).toBe('localFetch only works for local testing-URLs')
+        expect(e.message).toBe("localFetch only works for local testing-URLs")
       }
     }
   })
